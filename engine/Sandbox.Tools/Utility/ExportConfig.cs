@@ -54,6 +54,12 @@ public class ExportConfig
 	public bool PackAssets { get; set; }
 
 	/// <summary>
+	/// Omit files without discovered references, keeping explicit Resources and uncertain dynamic loads.
+	/// </summary>
+	[Title( "Exclude Unused Files" ), Description( "Analyze code and asset references before exporting. Explicit Resources and uncertain dynamic loads are kept." )]
+	public bool ExcludeUnusedFiles { get; set; }
+
+	/// <summary>
 	/// The Steam AppID for the target .exe
 	/// </summary>
 	[Title( "Steam App ID" )]

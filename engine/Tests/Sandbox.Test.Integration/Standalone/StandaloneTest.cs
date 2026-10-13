@@ -42,25 +42,36 @@ public class StandaloneTest
 	}
 
 	[TestMethod]
-	[DataRow( false )]
-	[DataRow( true )]
-	public async Task ExportAndRun( bool packAssets )
+	[DataRow( false, false )]
+	[DataRow( true, false )]
+	[DataRow( false, true )]
+	[DataRow( true, true )]
+	public async Task ExportAndRun( bool packAssets, bool filterUnusedFiles )
 	{
 		var config = new ExportConfig();
 		var tempFolderName = Guid.NewGuid().ToString();
 		config.TargetDir = Path.Combine( Path.GetTempPath(), tempFolderName, "sboxexportest" );
 		config.AppId = 480; // SpaceWar AppID
 		config.PackAssets = packAssets;
+		config.ExcludeUnusedFiles = filterUnusedFiles;
 		if ( packAssets ) config.ExecutableVersion = "2.3.4.5";
 		config.TargetIcon = "core/tools/images/hammer/appicon.ico"; // the wizard always offers one, so exercise the icon path
+		string sourceDocumentation = null;
+		var documentationName = $"unused_export_test_{Guid.NewGuid():N}.md";
 
 		try
 		{
 			var project = Project.AddFromFile( "unittest/addons/spacewars/.sbproj" );
 			config.Project = project;
 			config.ExecutableName = project.Package.Ident;
+			project.Config.Resources = "start.scene_c";
+			sourceDocumentation = Path.Combine( project.GetCodePath(), documentationName );
+			File.WriteAllText( sourceDocumentation, "Unreferenced developer documentation" );
 
 			CleanOutput( config );
+			var previousAssets = Path.Combine( config.TargetDir, Standalone.GamePath );
+			Directory.CreateDirectory( previousAssets );
+			File.WriteAllText( Path.Combine( previousAssets, documentationName ), "Previous unfiltered export" );
 			if ( packAssets )
 			{
 				var oldAssets = Path.Combine( config.TargetDir, Standalone.GamePath );
@@ -106,6 +117,8 @@ public class StandaloneTest
 				{
 					binFiles = exportedFiles.FindFile( ".bin" ).ToArray();
 					Assert.IsTrue( exportedFiles.FileExists( "start.scene_c" ), "Export is missing its startup scene" );
+					Assert.AreEqual( !filterUnusedFiles, exportedFiles.FileExists( documentationName ), "Only the opt-in filter should omit unreferenced documentation" );
+					if ( filterUnusedFiles ) Assert.IsFalse( File.Exists( Path.Combine( assets, documentationName ) ), "Filtered exports must also remove a previous loose copy" );
 					if ( packAssets ) Assert.IsTrue( Directory.EnumerateFiles( assets, "*", SearchOption.AllDirectories ).All( x => x.EndsWith( ".vpk" ) ), "Packed assets should have no loose content" );
 				}
 				finally { exportedFiles.Dispose(); }
@@ -187,6 +200,7 @@ public class StandaloneTest
 		}
 		finally
 		{
+			if ( sourceDocumentation is not null ) File.Delete( sourceDocumentation );
 			CleanOutput( config );
 		}
 	}

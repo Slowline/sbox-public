@@ -22,6 +22,7 @@ public partial class StandaloneExporter
 	private readonly List<string> _temporarySources = new();
 	private ExportConfig _exportConfig;
 	private string _packedAssetsFolder;
+	private ProjectFile[] _unusedFiles = [];
 
 	StandaloneExporter( ExportConfig config )
 	{
@@ -79,13 +80,13 @@ public partial class StandaloneExporter
 
 		ValidateExecutableName( _exportConfig.ExecutableName );
 		ParseExecutableVersion( _exportConfig.ExecutableVersion );
-		if ( _exportConfig.PackAssets )
+		if ( _exportConfig.PackAssets || _exportConfig.ExcludeUnusedFiles )
 		{
 			foreach ( var file in PackageManifest.Assets.Where( x => x.AbsolutePath is not null ) )
 			{
 				var target = Path.GetFullPath( Path.Combine( _exportConfig.TargetDir, Standalone.GamePath, file.Name ) );
 				if ( string.Equals( target, Path.GetFullPath( file.AbsolutePath ), StringComparison.OrdinalIgnoreCase ) )
-					throw new InvalidOperationException( "VPK export must not overwrite the project's source assets" );
+					throw new InvalidOperationException( "Filtered or VPK exports must not overwrite the project's source assets" );
 			}
 		}
 
@@ -100,6 +101,8 @@ public partial class StandaloneExporter
 			WriteExecutable();
 			Logger.Info( "Copying files.." );
 			await CopyAllFiles();
+			if ( _exportConfig.ExcludeUnusedFiles && _files.Any( x => x.Step == BuildStep.CopyProjectAssets && x.State != QueuedFileState.Copied ) )
+				throw new IOException( "Couldn't finish filtered export because some project files failed to copy" );
 			if ( _exportConfig.PackAssets )
 			{
 				if ( _files.Any( x => x.Step == BuildStep.CopyProjectAssets && x.State != QueuedFileState.Copied ) )
@@ -118,6 +121,14 @@ public partial class StandaloneExporter
 					var loose = Path.Combine( output, Path.GetRelativePath( _packedAssetsFolder, file ) );
 					if ( File.Exists( loose ) ) File.Delete( loose );
 				}
+			}
+			var assetsRoot = Path.GetFullPath( Path.Combine( _exportConfig.TargetDir, Standalone.GamePath ) ).TrimEnd( Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar ) + Path.DirectorySeparatorChar;
+			foreach ( var file in _unusedFiles )
+			{
+				var previous = Path.GetFullPath( Path.Combine( assetsRoot, file.Name ) );
+				if ( !previous.StartsWith( assetsRoot, StringComparison.OrdinalIgnoreCase ) )
+					throw new InvalidOperationException( $"Unused file '{file.Name}' resolves outside the export assets directory: '{previous}' outside '{assetsRoot}'" );
+				if ( File.Exists( previous ) ) File.Delete( previous );
 			}
 		}
 		finally
@@ -155,6 +166,8 @@ public partial class StandaloneExporter
 		StandaloneManifest = CreateStandaloneManifest( _exportConfig.TargetDir );
 
 		// Build queue
+		if ( _exportConfig.ExcludeUnusedFiles )
+			FilterUnusedFiles();
 		QueueAddonFiles( _exportConfig.TargetDir, BuildStep.CopyProjectAssets );
 		QueueBaseFiles( _exportConfig.TargetDir );
 	}

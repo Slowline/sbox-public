@@ -96,6 +96,7 @@ partial class StandaloneWizard
 								PublishConfig.TargetIcon = preset.Config.TargetIcon;
 								PublishConfig.StartupImage = preset.Config.StartupImage;
 								PublishConfig.PackAssets = preset.Config.PackAssets;
+								PublishConfig.ExcludeUnusedFiles = preset.Config.ExcludeUnusedFiles;
 								PublishConfig.AppId = preset.Config.AppId;
 								menu.Close();
 								CreateLayout();
@@ -220,6 +221,7 @@ partial class StandaloneWizard
 							sheet.AddProperty( PublishConfig, x => x.ExecutableVersion );
 							sheet.AddProperty( PublishConfig, x => x.TargetDir );
 							sheet.AddProperty( PublishConfig, x => x.PackAssets );
+							sheet.AddProperty( PublishConfig, x => x.ExcludeUnusedFiles );
 
 							col.Add( sheet );
 						}
