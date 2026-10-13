@@ -21,6 +21,7 @@ public partial class StandaloneExporter
 	private List<QueuedFile> _files = new();
 	private readonly List<string> _temporarySources = new();
 	private ExportConfig _exportConfig;
+	private string _packedAssetsFolder;
 
 	StandaloneExporter( ExportConfig config )
 	{
@@ -77,18 +78,51 @@ public partial class StandaloneExporter
 		Logger.Info( $"Exporting {Project.Config.Title} to {_exportConfig.TargetDir}" );
 
 		ValidateExecutableName( _exportConfig.ExecutableName );
+		if ( _exportConfig.PackAssets )
+		{
+			foreach ( var file in PackageManifest.Assets.Where( x => x.AbsolutePath is not null ) )
+			{
+				var target = Path.GetFullPath( Path.Combine( _exportConfig.TargetDir, Standalone.GamePath, file.Name ) );
+				if ( string.Equals( target, Path.GetFullPath( file.AbsolutePath ), StringComparison.OrdinalIgnoreCase ) )
+					throw new InvalidOperationException( "VPK export must not overwrite the project's source assets" );
+			}
+		}
 
 		Logger.Info( $"Compiling assemblies.." );
 		await Compile();
 
-		Logger.Info( $"Building manifest.." );
-		await BuildManifest();
-
-		Logger.Info( $"Writing executable.." );
-		WriteExecutable();
-
-		Logger.Info( $"Copying files.." );
-		await CopyAllFiles();
+		try
+		{
+			Logger.Info( "Building manifest.." );
+			await BuildManifest();
+			Logger.Info( "Writing executable.." );
+			WriteExecutable();
+			Logger.Info( "Copying files.." );
+			await CopyAllFiles();
+			if ( _exportConfig.PackAssets )
+			{
+				if ( _files.Any( x => x.Step == BuildStep.CopyProjectAssets && x.State != QueuedFileState.Copied ) )
+					throw new IOException( "Couldn't pack assets because some export files failed to copy" );
+				Logger.Info( "Packing game assets into VPK.." );
+				var archiveFolder = Path.Combine( Path.GetDirectoryName( _packedAssetsFolder ), "archive" );
+				Directory.CreateDirectory( archiveFolder );
+				await VpkArchive.WriteAsync( _packedAssetsFolder, Path.Combine( archiveFolder, Standalone.AssetsArchiveName ) );
+				var output = Path.Combine( _exportConfig.TargetDir, Standalone.GamePath );
+				Directory.CreateDirectory( output );
+				foreach ( var file in Directory.EnumerateFiles( archiveFolder ) )
+					File.Move( file, Path.Combine( output, Path.GetFileName( file ) ), true );
+				// shortcut: remove only this export's loose files; use a clean target to discard obsolete assets from older exports.
+				foreach ( var file in Directory.EnumerateFiles( _packedAssetsFolder, "*", SearchOption.AllDirectories ) )
+				{
+					var loose = Path.Combine( output, Path.GetRelativePath( _packedAssetsFolder, file ) );
+					if ( File.Exists( loose ) ) File.Delete( loose );
+				}
+			}
+		}
+		finally
+		{
+			if ( _packedAssetsFolder is not null ) Directory.Delete( Path.GetDirectoryName( _packedAssetsFolder ), true );
+		}
 
 		Logger.Info( $"Export complete!" );
 	}
@@ -159,13 +193,19 @@ public partial class StandaloneExporter
 			Name = _exportConfig.Project.Package.Title,
 			AppId = _exportConfig.AppId,
 
-			IsVRProject = controlSettings.IsVROnly
+			IsVRProject = controlSettings.IsVROnly,
+			PackAssets = _exportConfig.PackAssets
 		};
 	}
 
 	private void QueueAddonFiles( string baseDir, BuildStep type )
 	{
 		var targetDir = Path.Combine( baseDir, Standalone.GamePath );
+		if ( _exportConfig.PackAssets )
+		{
+			_packedAssetsFolder = Path.Combine( Path.GetTempPath(), $"sbox-vpk-{Guid.NewGuid():N}", "assets" );
+			targetDir = _packedAssetsFolder;
+		}
 		Directory.CreateDirectory( targetDir );
 
 		var targets = PackageManifest.Assets.Where( x => !x.Skip ).ToArray();
@@ -173,7 +213,13 @@ public partial class StandaloneExporter
 
 		foreach ( var t in targets )
 		{
-			QueueCopyFile( targetDir, t, type );
+			if ( _exportConfig.PackAssets && t.Name.EndsWith( ".vpk", StringComparison.OrdinalIgnoreCase ) &&
+				VpkArchive.IsArchiveFile( Path.Combine( baseDir, Standalone.GamePath, Standalone.AssetsArchiveName ), Path.Combine( baseDir, Standalone.GamePath, t.Name ) ) )
+				throw new InvalidOperationException( $"Asset '{t.Name}' conflicts with the standalone assets archive name" );
+
+			var directory = _exportConfig.PackAssets && t.Name.EndsWith( ".vpk", StringComparison.OrdinalIgnoreCase )
+				? Path.Combine( baseDir, Standalone.GamePath ) : targetDir;
+			QueueCopyFile( directory, t, type );
 		}
 	}
 

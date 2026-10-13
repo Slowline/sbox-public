@@ -31,4 +31,9 @@ public class StandaloneManifest
 	/// Should we automatically launch this project in VR?
 	/// </summary>
 	public bool IsVRProject { get; set; } = false;
+
+	/// <summary>
+	/// Game content, including assemblies, is stored in the standalone assets VPK.
+	/// </summary>
+	public bool PackAssets { get; set; }
 }

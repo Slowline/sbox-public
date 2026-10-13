@@ -118,6 +118,7 @@ internal class GameInstance : IGameInstance
 
 		// Destroy resource manifests before unmounting their package or network-backed files.
 		Game.Resources.Clear();
+		if ( this is StandaloneGameInstance standalone ) standalone.UnmountPackedAssets();
 
 		if ( activePackage != null && !Application.IsStandalone )
 		{

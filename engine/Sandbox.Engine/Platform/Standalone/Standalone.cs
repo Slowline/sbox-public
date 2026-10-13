@@ -13,6 +13,7 @@ public static class Standalone
 	/// here - what the game is (its manifest and project config) is in the executable's resources.
 	/// </summary>
 	internal const string GamePath = "assets/";
+	internal const string AssetsArchiveName = "standalone_assets.vpk";
 
 	/// <summary>
 	/// Name of the RCDATA resource holding the serialized <see cref="StandaloneManifest"/>.

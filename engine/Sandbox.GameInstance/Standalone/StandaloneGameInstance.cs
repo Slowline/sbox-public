@@ -5,6 +5,7 @@
 /// </summary>
 internal partial class StandaloneGameInstance : GameInstance
 {
+	string _archivePath;
 	public StandaloneGameInstance( string ident, GameLoadingFlags flags ) : base( ident, flags )
 	{
 		this.flags = flags;
@@ -15,6 +16,13 @@ internal partial class StandaloneGameInstance : GameInstance
 	/// </summary>
 	public override async Task<bool> LoadAsync( PackageLoader.Enroller enroller, CancellationToken token )
 	{
+		if ( Standalone.Manifest.PackAssets )
+		{
+			NativeEngine.FullFileSystem.AddProjectPath( Ident, Standalone.GamePath );
+			_archivePath = System.IO.Path.GetFullPath( System.IO.Path.Combine( Standalone.GamePath, Standalone.AssetsArchiveName ) );
+			NativeEngine.EngineGlue.AddSearchPath( _archivePath, "GAME", true );
+		}
+
 		// The project config was embedded in our executable at export time - assets/ holds only content
 		var project = Project.AddFromEmbeddedConfig( Standalone.ProjectConfigJson, Standalone.GamePath );
 		await Project.SyncWithPackageManager();
@@ -75,8 +83,8 @@ internal partial class StandaloneGameInstance : GameInstance
 
 		LoadingScreen.Title = $"Loading Resources";
 
-		FileSystem.Mounted.Mount( new LocalFileSystem( Standalone.GamePath ) );
-		NativeEngine.FullFileSystem.AddProjectPath( Ident, Standalone.GamePath );
+		FileSystem.Mounted.Mount( project.FileSystem );
+		if ( !Standalone.Manifest.PackAssets ) NativeEngine.FullFileSystem.AddProjectPath( Ident, Standalone.GamePath );
 
 		NativeEngine.g_pResourceSystem.InvalidateDatabase();
 		NativeEngine.g_pResourceSystem.ReloadSymlinkedResidentResources();
@@ -93,10 +101,9 @@ internal partial class StandaloneGameInstance : GameInstance
 
 		// Initialize localization
 		Game.Language = new LanguageContainer();
-		var localizationPath = System.IO.Path.Combine( Standalone.GamePath, "Localization" );
-		if ( System.IO.Directory.Exists( localizationPath ) )
+		if ( project.LocalizationFileSystem is not null )
 		{
-			Game.Language.FileSystem.CreateAndMount( localizationPath );
+			Game.Language.FileSystem.Mount( project.LocalizationFileSystem );
 			Game.Language.Refresh();
 		}
 
@@ -125,5 +132,11 @@ internal partial class StandaloneGameInstance : GameInstance
 		}
 
 		return true;
+	}
+
+	internal void UnmountPackedAssets()
+	{
+		if ( _archivePath is not null ) NativeEngine.EngineGlue.RemoveSearchPath( _archivePath, "GAME" );
+		_archivePath = null;
 	}
 }

@@ -304,10 +304,14 @@ public sealed partial class Project
 			// decide whether it's including any code
 			if ( RootDirectory is null || !RootDirectory.Exists ) return;
 
-			FileSystem = new LocalFileSystem( RootDirectory.FullName );
+			var packed = IsReadOnly && Application.IsStandalone && Standalone.Manifest.PackAssets;
+			FileSystem = packed
+				? new VpkFileSystem( Path.Combine( RootDirectory.FullName, Standalone.AssetsArchiveName ) )
+				: new LocalFileSystem( RootDirectory.FullName );
 
 			CodeFileSystem = CreateFolderFileSystem( "Code" );
-			AssetsFileSystem = CreateFolderFileSystem( "Assets" );
+			AssetsFileSystem = packed ? new AggregateFileSystem() : CreateFolderFileSystem( "Assets" );
+			if ( packed ) AssetsFileSystem.Mount( FileSystem );
 			LocalizationFileSystem = CreateFolderFileSystem( "Localization" );
 			ProjectSettingsFileSystem = CreateFolderFileSystem( "ProjectSettings" );
 		}
@@ -349,7 +353,7 @@ public sealed partial class Project
 	/// <summary>
 	/// Absolute path to one of our well known project folders, with the casing it has on disk.
 	/// </summary>
-	private string GetProjectFolder( string name ) => FileSystem?.GetFullPath( name ) ?? System.IO.Path.Combine( RootDirectory.FullName, name );
+	private string GetProjectFolder( string name ) => FileSystem is VpkFileSystem ? Path.Combine( RootDirectory.FullName, name ) : FileSystem?.GetFullPath( name ) ?? Path.Combine( RootDirectory.FullName, name );
 
 	/// <summary>
 	/// Does this project have a well known folder called <paramref name="name"/>?

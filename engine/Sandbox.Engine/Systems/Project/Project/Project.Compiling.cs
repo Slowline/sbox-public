@@ -440,13 +440,12 @@ public partial class Project
 		if ( Application.IsEditor || Application.IsUnitTest || Application.IsHeadless )
 			return false;
 
-		var assemblyPath = Path.Combine( GetRootPath(), ".bin" );
-		if ( !Directory.Exists( assemblyPath ) )
+		if ( FileSystem is null || !FileSystem.DirectoryExists( ".bin" ) )
 		{
 			return false;
 		}
 
-		var assemblies = Directory.EnumerateFiles( assemblyPath, "*.dll" );
+		var assemblies = FileSystem.FindFile( ".bin", "*.dll" );
 		if ( assemblies.Count() == 0 )
 		{
 			return false;
@@ -455,7 +454,7 @@ public partial class Project
 		AssemblyFileSystem.CreateDirectory( "/.bin" );
 		foreach ( var assembly in assemblies )
 		{
-			AssemblyFileSystem.WriteAllBytes( $"/.bin/{Path.GetFileName( assembly )}", File.ReadAllBytes( assembly ) );
+			AssemblyFileSystem.WriteAllBytes( $"/.bin/{Path.GetFileName( assembly )}", FileSystem.ReadAllBytes( $".bin/{assembly}" ).ToArray() );
 		}
 
 		return true;

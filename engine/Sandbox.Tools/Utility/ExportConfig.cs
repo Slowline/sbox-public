@@ -42,6 +42,12 @@ public class ExportConfig
 	public string StartupImage { get; set; }
 
 	/// <summary>
+	/// Pack game content into a VPK instead of exporting loose files.
+	/// </summary>
+	[Title( "Pack Assets into VPK" )]
+	public bool PackAssets { get; set; }
+
+	/// <summary>
 	/// The Steam AppID for the target .exe
 	/// </summary>
 	[Title( "Steam App ID" )]

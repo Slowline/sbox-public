@@ -54,9 +54,8 @@ internal static partial class PackageManager
 
 				if ( Application.IsStandalone )
 				{
-					var binPath = Path.Combine( localPackage.Project.GetRootPath(), ".bin" );
-					System.IO.Directory.CreateDirectory( binPath );
-					o.AssemblyFileSystem.CreateAndMount( binPath );
+					if ( localPackage.Project.FileSystem.DirectoryExists( ".bin" ) )
+						o.AssemblyFileSystem.Mount( localPackage.Project.FileSystem.CreateSubSystem( ".bin" ) );
 				}
 				else
 				{

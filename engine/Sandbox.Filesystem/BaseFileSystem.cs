@@ -161,6 +161,8 @@ public class BaseFileSystem
 	/// </summary>
 	public string GetFullPath( string path )
 	{
+		if ( this is VpkFileSystem ) return system.ConvertPathToInternal( FixPath( path ) );
+
 		if ( path.Contains( ":" ) )
 			return path;
 
@@ -460,7 +462,7 @@ public class BaseFileSystem
 		// expecting: on Linux that means a fresh set of inotify instances per call - one per
 		// mounted filesystem in the aggregate - and the editor watches a stylesheet at a time
 		// until it hits the 128 instance limit and the whole thing falls over.
-		if ( watcher == null && !watchUnavailable )
+		if ( watcher == null && !watchUnavailable && system.CanWatch( "/" ) )
 		{
 			try
 			{

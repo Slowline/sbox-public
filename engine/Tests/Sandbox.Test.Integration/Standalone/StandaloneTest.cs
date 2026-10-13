@@ -12,10 +12,27 @@ namespace StandaloneTests;
 [TestClass]
 public class StandaloneTest
 {
+	[TestMethod]
+	public void ExportPresetsKeepPackingOption()
+	{
+		var saved = System.Text.Json.JsonSerializer.Serialize( new ExportConfig { PackAssets = true } );
+		Assert.IsTrue( System.Text.Json.JsonSerializer.Deserialize<ExportConfig>( saved ).PackAssets );
+		Assert.IsFalse( System.Text.Json.JsonSerializer.Deserialize<ExportConfig>( "{}" ).PackAssets, "Older presets should keep exporting loose assets" );
+	}
+
 	[TestInitialize]
 	public void TestInitialize()
 	{
 		Project.Clear();
+	}
+
+	[TestMethod]
+	public async Task PackedExportRejectsSourceAssetsAsTarget()
+	{
+		var project = Project.AddFromFile( "unittest/addons/spacewars/.sbproj" );
+		var config = new ExportConfig { Project = project, TargetDir = project.GetRootPath(), ExecutableName = "test", PackAssets = true };
+		var exporter = await StandaloneExporter.FromConfig( config );
+		await Assert.ThrowsExceptionAsync<InvalidOperationException>( () => exporter.Run() );
 	}
 
 	[TestCleanup]
@@ -25,12 +42,15 @@ public class StandaloneTest
 	}
 
 	[TestMethod]
-	public async Task ExportAndRun()
+	[DataRow( false )]
+	[DataRow( true )]
+	public async Task ExportAndRun( bool packAssets )
 	{
 		var config = new ExportConfig();
 		var tempFolderName = Guid.NewGuid().ToString();
 		config.TargetDir = Path.Combine( Path.GetTempPath(), tempFolderName, "sboxexportest" );
 		config.AppId = 480; // SpaceWar AppID
+		config.PackAssets = packAssets;
 		config.TargetIcon = "core/tools/images/hammer/appicon.ico"; // the wizard always offers one, so exercise the icon path
 
 		try
@@ -40,12 +60,19 @@ public class StandaloneTest
 			config.ExecutableName = project.Package.Ident;
 
 			CleanOutput( config );
+			if ( packAssets )
+			{
+				var oldAssets = Path.Combine( config.TargetDir, Standalone.GamePath );
+				Directory.CreateDirectory( oldAssets );
+				File.WriteAllText( Path.Combine( oldAssets, "start.scene_c" ), "Previous loose export" );
+			}
 
 			//
 			// Build the project
 			//
 			{
 				var exporter = await StandaloneExporter.FromConfig( config );
+				await exporter.AddFile( File.ReadAllBytes( "core/maps/error.vpk" ), "maps/export_test.vpk" );
 				await exporter.Run();
 			}
 
@@ -66,11 +93,21 @@ public class StandaloneTest
 				Assert.AreEqual( 1, Directory.GetFiles( config.TargetDir ).Length, $"Only the executable should sit in the export root, found: {string.Join( ", ", Directory.GetFiles( config.TargetDir ).Select( Path.GetFileName ) )}" );
 
 				var assets = Path.Combine( config.TargetDir, Standalone.GamePath );
+				Assert.IsTrue( File.Exists( Path.Combine( assets, "maps", "export_test.vpk" ) ), "Map VPKs must stay loose" );
+				if ( packAssets ) Assert.IsFalse( new VpkArchive( Path.Combine( assets, Standalone.AssetsArchiveName ) ).Entries.ContainsKey( "/maps/export_test.vpk" ), "Map VPKs must not be nested inside the assets archive" );
 				Assert.IsFalse( File.Exists( Path.Combine( assets, ".sbproj" ) ), "Export shouldn't have a loose .sbproj" );
 				Assert.IsFalse( File.Exists( Path.Combine( assets, "standalone.manifest.json" ) ), "Export shouldn't have a loose manifest" );
 
 				// Only compiled assemblies ship - never the code archive (the game's source) or doc xml
-				var binFiles = Directory.GetFiles( Path.Combine( assets, ".bin" ) ).Select( Path.GetFileName ).ToArray();
+				var exportedFiles = packAssets ? (BaseFileSystem)new VpkFileSystem( Path.Combine( assets, Standalone.AssetsArchiveName ) ) : new LocalFileSystem( assets );
+				string[] binFiles;
+				try
+				{
+					binFiles = exportedFiles.FindFile( ".bin" ).ToArray();
+					Assert.IsTrue( exportedFiles.FileExists( "start.scene_c" ), "Export is missing its startup scene" );
+					if ( packAssets ) Assert.IsTrue( Directory.EnumerateFiles( assets, "*", SearchOption.AllDirectories ).All( x => x.EndsWith( ".vpk" ) ), "Packed assets should have no loose content" );
+				}
+				finally { exportedFiles.Dispose(); }
 				Assert.IsTrue( binFiles.Length > 0, ".bin should contain the game's assemblies" );
 				CollectionAssert.AreEquivalent( binFiles.Where( f => f.EndsWith( ".dll" ) ).ToArray(), binFiles, $".bin should only contain assemblies, has: {string.Join( ", ", binFiles )}" );
 
@@ -101,6 +138,7 @@ public class StandaloneTest
 						WorkingDirectory = config.TargetDir,
 						Arguments = "-headless -test-standalone",
 						RedirectStandardError = true,
+						RedirectStandardOutput = true,
 						UseShellExecute = false,
 						CreateNoWindow = true
 					}
@@ -112,11 +150,16 @@ public class StandaloneTest
 					if ( e.Data != null )
 						Console.Error.WriteLine( e.Data );
 				};
+				process.OutputDataReceived += ( sender, e ) =>
+				{
+					if ( e.Data is not null ) Console.WriteLine( e.Data );
+				};
 
 				bool success = process.Start();
 				Assert.IsTrue( success, "Failed to start standalone exe" );
 
 				process.BeginErrorReadLine();
+				process.BeginOutputReadLine();
 
 				// A hung exe would otherwise stall the whole serial suite - kill it after a generous timeout
 				using var timeout = new CancellationTokenSource( TimeSpan.FromMinutes( 5 ) );
