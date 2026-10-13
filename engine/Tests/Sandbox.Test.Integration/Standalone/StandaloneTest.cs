@@ -116,8 +116,10 @@ public class StandaloneTest
 				var versionInfo = FileVersionInfo.GetVersionInfo( executable );
 				Assert.AreEqual( config.ExecutableVersion, versionInfo.FileVersion );
 				Assert.AreEqual( config.ExecutableVersion, versionInfo.ProductVersion );
-				Assert.AreEqual( Version.Parse( config.ExecutableVersion ).Major, versionInfo.FileMajorPart );
-				Assert.AreEqual( Version.Parse( config.ExecutableVersion ).Revision, versionInfo.FilePrivatePart );
+				var expectedVersion = Version.Parse( config.ExecutableVersion );
+				var versionParts = (expectedVersion.Major, expectedVersion.Minor, expectedVersion.Build, expectedVersion.Revision);
+				Assert.AreEqual( versionParts, (versionInfo.FileMajorPart, versionInfo.FileMinorPart, versionInfo.FileBuildPart, versionInfo.FilePrivatePart) );
+				Assert.AreEqual( versionParts, (versionInfo.ProductMajorPart, versionInfo.ProductMinorPart, versionInfo.ProductBuildPart, versionInfo.ProductPrivatePart) );
 				Assert.AreEqual( project.Config.Title, versionInfo.ProductName, "Executable's version info should name the game" );
 				Assert.AreEqual( project.Config.Title, versionInfo.FileDescription, "Executable's version info should name the game" );
 				Assert.IsFalse( (versionInfo.OriginalFilename ?? "").Contains( "sbox-standalone" ), "Executable still carries the template's version info" );
