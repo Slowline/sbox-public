@@ -9,68 +9,16 @@ namespace Sandbox;
 /// </summary>
 internal sealed class VpkArchive
 {
-	internal const uint Signature = 0x55AA1234;
-	internal record Entry( string Archive, long Offset, long Length, byte[] Preload, bool IsLoose = false );
-	internal Dictionary<string, Entry> Entries { get; } = new( StringComparer.OrdinalIgnoreCase );
+	internal Dictionary<string, VpkDirectory.Entry> Entries { get; }
 
 	internal VpkArchive( string filename )
 	{
-		filename = Path.GetFullPath( filename );
-		using var stream = File.OpenRead( filename );
-		using var reader = new BinaryReader( stream );
-		if ( reader.ReadUInt32() != Signature ) throw new InvalidDataException( "Invalid VPK signature" );
-		var version = reader.ReadUInt32();
-		var treeSize = reader.ReadUInt32();
-		var embeddedSize = version == 2 ? reader.ReadUInt32() : 0;
-		if ( version == 2 ) reader.ReadBytes( 12 );
-		else if ( version != 1 ) throw new InvalidDataException( $"Unsupported VPK version {version}" );
-		var treeEnd = stream.Position + treeSize;
-		if ( treeEnd > stream.Length ) throw new InvalidDataException( "Truncated VPK directory" );
-
-		string ReadString()
+		Entries = VpkDirectory.ReadEntries( filename );
+		foreach ( var (path, entry) in Entries )
 		{
-			var bytes = new List<byte>();
-			while ( stream.Position < treeEnd )
-			{
-				var value = reader.ReadByte();
-				if ( value == 0 ) return Encoding.UTF8.GetString( bytes.ToArray() );
-				bytes.Add( value );
-			}
-			throw new InvalidDataException( "Unterminated VPK directory string" );
+			if ( entry.Offset + entry.Length > new FileInfo( entry.Archive ).Length )
+				throw new InvalidDataException( $"Truncated VPK data for {path}" );
 		}
-
-		for ( var extension = ReadString(); extension.Length > 0; extension = ReadString() )
-		{
-			for ( var directory = ReadString(); directory.Length > 0; directory = ReadString() )
-			{
-				for ( var name = ReadString(); name.Length > 0; name = ReadString() )
-				{
-					if ( stream.Position + 18 > treeEnd ) throw new InvalidDataException( "Truncated VPK entry" );
-					reader.ReadUInt32(); // CRC
-					var preloadLength = reader.ReadUInt16();
-					var archiveIndex = reader.ReadUInt16();
-					var offset = reader.ReadUInt32();
-					var length = reader.ReadUInt32();
-					if ( reader.ReadUInt16() != 0xFFFF ) throw new InvalidDataException( "Invalid VPK entry" );
-					var preload = reader.ReadBytes( preloadLength );
-					if ( preload.Length != preloadLength || stream.Position > treeEnd ) throw new InvalidDataException( "Truncated VPK entry" );
-					var path = (directory == " " ? "" : directory + "/") + name + (extension == " " ? "" : "." + extension);
-					if ( path.Contains( '\\' ) || path.Split( '/' ).Any( x => x is "" or "." or ".." ) || path.Contains( ':' ) )
-						throw new InvalidDataException( "Invalid VPK path" );
-					var archive = filename;
-					long dataOffset = treeEnd + offset;
-					if ( archiveIndex != 0x7FFF )
-					{
-						archive = ArchiveBase( filename ) + $"_{archiveIndex:D3}.vpk";
-						dataOffset = offset;
-					}
-					var dataEnd = archive == filename && version == 2 ? treeEnd + embeddedSize : new FileInfo( archive ).Length;
-					if ( dataOffset + length > dataEnd ) throw new InvalidDataException( $"Truncated VPK data for {path}" );
-					if ( !Entries.TryAdd( "/" + path, new( archive, dataOffset, length, preload ) ) ) throw new InvalidDataException( $"Duplicate VPK path {path}" );
-				}
-			}
-		}
-		if ( stream.Position != treeEnd ) throw new InvalidDataException( "Invalid VPK directory size" );
 	}
 
 	internal Stream OpenRead( string path )
@@ -85,7 +33,7 @@ internal sealed class VpkArchive
 	internal static async Task WriteAsync( string folder, string filename, long chunkSize = 1024L * 1024 * 1024 )
 	{
 		if ( !filename.EndsWith( ".vpk", StringComparison.OrdinalIgnoreCase ) ) throw new ArgumentException( "VPK filename must end in .vpk", nameof( filename ) );
-		var archiveBase = ArchiveBase( filename );
+		var archiveBase = VpkDirectory.ArchiveBase( filename );
 		if ( chunkSize <= 0 || chunkSize > uint.MaxValue ) throw new ArgumentOutOfRangeException( nameof( chunkSize ) );
 		var files = Directory.EnumerateFiles( folder, "*", SearchOption.AllDirectories )
 			.Select( source => (Source: source, Path: Path.GetRelativePath( folder, source ).Replace( '\\', '/' ).ToLowerInvariant()) )
@@ -151,7 +99,7 @@ internal sealed class VpkArchive
 		using var header = new BinaryWriter( output, Encoding.UTF8, true );
 		var embedded = archiveBase + "_000.vpk";
 		var embeddedSize = File.Exists( embedded ) ? checked((uint)new FileInfo( embedded ).Length) : 0;
-		header.Write( Signature );
+		header.Write( VpkDirectory.Signature );
 		header.Write( 2u );
 		header.Write( checked((uint)tree.Length) );
 		header.Write( embeddedSize );
@@ -177,25 +125,23 @@ internal sealed class VpkArchive
 		output.Write( checksum );
 	}
 
-	static string ArchiveBase( string filename ) => filename.EndsWith( "_dir.vpk", StringComparison.OrdinalIgnoreCase ) ? filename[..^8] : filename[..^4];
-
 	internal static bool IsArchiveFile( string archive, string file )
 	{
 		archive = Path.GetFullPath( archive );
 		file = Path.GetFullPath( file );
 		if ( string.Equals( archive, file, StringComparison.OrdinalIgnoreCase ) ) return true;
 		if ( !string.Equals( Path.GetDirectoryName( archive ), Path.GetDirectoryName( file ), StringComparison.OrdinalIgnoreCase ) ) return false;
-		var prefix = Path.GetFileName( ArchiveBase( archive ) ) + "_";
+		var prefix = Path.GetFileName( VpkDirectory.ArchiveBase( archive ) ) + "_";
 		var name = Path.GetFileNameWithoutExtension( file );
 		return name.StartsWith( prefix, StringComparison.OrdinalIgnoreCase ) && ushort.TryParse( name[prefix.Length..], out _ );
 	}
 
 	sealed class EntryStream : Stream
 	{
-		readonly Entry entry;
+		readonly VpkDirectory.Entry entry;
 		readonly FileStream file;
 		long position;
-		internal EntryStream( Entry entry ) { this.entry = entry; file = File.OpenRead( entry.Archive ); }
+		internal EntryStream( VpkDirectory.Entry entry ) { this.entry = entry; file = File.OpenRead( entry.Archive ); }
 		public override bool CanRead => true;
 		public override bool CanSeek => true;
 		public override bool CanWrite => false;

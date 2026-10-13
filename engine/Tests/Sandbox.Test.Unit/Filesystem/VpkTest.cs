@@ -22,6 +22,7 @@ public class VpkTest
 			File.WriteAllBytes( Path.Combine( source, "empty.dat" ), [] );
 			var filename = Path.Combine( root, "assets.vpk" );
 			await VpkArchive.WriteAsync( source, filename, 8 );
+			CollectionAssert.AreEquivalent( new[] { (".bin/game.dll", 4L), ("empty.dat", 0L), ("localization/en/hello.txt", 11L), ("no_extension", 4L) }, VpkDirectory.Read( filename ).ToArray() );
 			Directory.CreateDirectory( Path.Combine( root, "maps" ) );
 			var map = Path.Combine( root, "maps", "level.vpk" );
 			File.WriteAllBytes( map, [11, 12] );
@@ -67,6 +68,7 @@ public class VpkTest
 			finally { fs.Dispose(); }
 			using ( var chunk = File.OpenWrite( Path.Combine( root, "assets_001.vpk" ) ) ) chunk.SetLength( 0 );
 			Assert.ThrowsException<InvalidDataException>( () => new VpkArchive( filename ) );
+			Assert.AreEqual( 4, VpkDirectory.Read( filename ).Count, "Map analysis must only need the directory, even when a data chunk is incomplete" );
 		}
 		finally { Directory.Delete( root, true ); }
 	}
