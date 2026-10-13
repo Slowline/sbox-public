@@ -87,6 +87,7 @@ engine/TestResults/
 /game/bin/**/*.pdb
 /game/bin/**/*.dll
 /game/bin/**/*.xml
+/game/bin/**/*.md
 /game/bin/**/*.json
 /game/bin/win64/logs
 /game/config/**/*.json
