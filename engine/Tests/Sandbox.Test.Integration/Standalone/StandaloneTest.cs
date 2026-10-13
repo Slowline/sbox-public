@@ -51,6 +51,7 @@ public class StandaloneTest
 		config.TargetDir = Path.Combine( Path.GetTempPath(), tempFolderName, "sboxexportest" );
 		config.AppId = 480; // SpaceWar AppID
 		config.PackAssets = packAssets;
+		if ( packAssets ) config.ExecutableVersion = "2.3.4.5";
 		config.TargetIcon = "core/tools/images/hammer/appicon.ico"; // the wizard always offers one, so exercise the icon path
 
 		try
@@ -113,6 +114,10 @@ public class StandaloneTest
 
 				// What Windows shows for the exe (Explorer, Defender, SmartScreen) is the game, not the template it was made from
 				var versionInfo = FileVersionInfo.GetVersionInfo( executable );
+				Assert.AreEqual( config.ExecutableVersion, versionInfo.FileVersion );
+				Assert.AreEqual( config.ExecutableVersion, versionInfo.ProductVersion );
+				Assert.AreEqual( Version.Parse( config.ExecutableVersion ).Major, versionInfo.FileMajorPart );
+				Assert.AreEqual( Version.Parse( config.ExecutableVersion ).Revision, versionInfo.FilePrivatePart );
 				Assert.AreEqual( project.Config.Title, versionInfo.ProductName, "Executable's version info should name the game" );
 				Assert.AreEqual( project.Config.Title, versionInfo.FileDescription, "Executable's version info should name the game" );
 				Assert.IsFalse( (versionInfo.OriginalFilename ?? "").Contains( "sbox-standalone" ), "Executable still carries the template's version info" );

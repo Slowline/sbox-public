@@ -37,7 +37,7 @@ partial class StandaloneExporter
 		private static readonly IntPtr RT_VERSION = new( 16 );
 		private const ushort LanguageNeutral = 0;
 
-		public record VersionInfo( string Title, string Company, string Comments );
+		public record VersionInfo( string Title, string Company, string Comments, Version Version );
 
 		/// <summary>
 		/// Write named RCDATA blobs, replace the version info, and (if <paramref name="icoPath"/> is given) the icon.
@@ -96,17 +96,19 @@ partial class StandaloneExporter
 		/// </summary>
 		private static byte[] BuildVersionInfo( VersionInfo info )
 		{
-			const string version = "1.0.0.0";
+			var version = info.Version.ToString( 4 );
+			var versionMS = ((uint)info.Version.Major << 16) | (uint)info.Version.Minor;
+			var versionLS = ((uint)info.Version.Build << 16) | (uint)info.Version.Revision;
 
 			var fixedInfo = new MemoryStream();
 			using ( var w = new BinaryWriter( fixedInfo ) )
 			{
 				w.Write( 0xFEEF04BDu );   // dwSignature
 				w.Write( 0x00010000u );   // dwStrucVersion
-				w.Write( 0x00010000u );   // dwFileVersionMS 1.0
-				w.Write( 0u );            // dwFileVersionLS .0.0
-				w.Write( 0x00010000u );   // dwProductVersionMS
-				w.Write( 0u );            // dwProductVersionLS
+				w.Write( versionMS );     // dwFileVersionMS
+				w.Write( versionLS );     // dwFileVersionLS
+				w.Write( versionMS );     // dwProductVersionMS
+				w.Write( versionLS );     // dwProductVersionLS
 				w.Write( 0x3Fu );         // dwFileFlagsMask
 				w.Write( 0u );            // dwFileFlags
 				w.Write( 0x00040004u );   // dwFileOS: VOS_NT_WINDOWS32

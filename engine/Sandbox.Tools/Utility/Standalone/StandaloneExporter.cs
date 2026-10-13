@@ -78,6 +78,7 @@ public partial class StandaloneExporter
 		Logger.Info( $"Exporting {Project.Config.Title} to {_exportConfig.TargetDir}" );
 
 		ValidateExecutableName( _exportConfig.ExecutableName );
+		ParseExecutableVersion( _exportConfig.ExecutableVersion );
 		if ( _exportConfig.PackAssets )
 		{
 			foreach ( var file in PackageManifest.Assets.Where( x => x.AbsolutePath is not null ) )

@@ -58,9 +58,17 @@ partial class StandaloneExporter
 			[Standalone.ProjectConfigResourceName] = Encoding.UTF8.GetBytes( Project.Config.ToJson() ),
 		};
 
-		PeResources.Write( executablePath, data, new PeResources.VersionInfo( title, Project.Config.Org, $"Built {_exportConfig.BuildDate:u} with s&box" ), _exportConfig.TargetIcon );
+		PeResources.Write( executablePath, data, new PeResources.VersionInfo( title, Project.Config.Org, $"Built {_exportConfig.BuildDate:u} with s&box", ParseExecutableVersion( _exportConfig.ExecutableVersion ) ), _exportConfig.TargetIcon );
 
 		Logger.Info( $"Wrote {executablePath}" );
+	}
+
+	internal static Version ParseExecutableVersion( string value )
+	{
+		if ( !Version.TryParse( value, out var version ) || version.Revision < 0 ||
+			version.Major > ushort.MaxValue || version.Minor > ushort.MaxValue || version.Build > ushort.MaxValue || version.Revision > ushort.MaxValue )
+			throw new ArgumentException( "Executable version must contain four numbers from 0 to 65535, e.g. 1.0.0.0", nameof( value ) );
+		return version;
 	}
 
 	/// <summary>

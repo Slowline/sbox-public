@@ -91,6 +91,7 @@ partial class StandaloneWizard
 								// Every wizard page shares the one config, so copy the preset into it
 								// rather than replacing this page's reference - otherwise the export never sees it
 								PublishConfig.ExecutableName = preset.Config.ExecutableName;
+								PublishConfig.ExecutableVersion = preset.Config.ExecutableVersion;
 								PublishConfig.TargetDir = preset.Config.TargetDir;
 								PublishConfig.TargetIcon = preset.Config.TargetIcon;
 								PublishConfig.StartupImage = preset.Config.StartupImage;
@@ -216,6 +217,7 @@ partial class StandaloneWizard
 							sheet.Margin = new Margin( 0 );
 
 							sheet.AddProperty( PublishConfig, x => x.ExecutableName );
+							sheet.AddProperty( PublishConfig, x => x.ExecutableVersion );
 							sheet.AddProperty( PublishConfig, x => x.TargetDir );
 							sheet.AddProperty( PublishConfig, x => x.PackAssets );
 

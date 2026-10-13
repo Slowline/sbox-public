@@ -30,6 +30,12 @@ public class ExportConfig
 	public string ExecutableName { get; set; }
 
 	/// <summary>
+	/// File and product version shown in the executable's Windows properties.
+	/// </summary>
+	[Title( "Executable Version" ), Description( "Four numbers from 0 to 65535, e.g. 1.0.0.0" )]
+	public string ExecutableVersion { get; set; } = "1.0.0.0";
+
+	/// <summary>
 	/// The icon for the target .exe
 	/// </summary>
 	[Title( "Executable Icon" )] // can't make this a .ico picker yet, we should really just convert from png ourselves though
