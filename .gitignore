@@ -49,6 +49,7 @@
 #
 # Some junk
 #
+/scripts
 
 # Local input files
 *#local.json
