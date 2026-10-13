@@ -17,6 +17,19 @@ public class UnusedExportFilesTest
 	}
 
 	[TestMethod]
+	public void TextWildcardsAndDocumentationCommentsAreNotFileAccesses()
+	{
+		var code = "var all = name is \"all\" or \"*\"; var search = \"*.md\"; var ratio = $\"{count}/{total}\"; var timing = $\"{whole}.{fraction}\"; var save = Path.Combine(folder, name); // see README.md\n/* see OTHER.md */\n/// See THIRD.md\nvar balance = FileSystem.Mounted.ReadAllText(\"balance.txt\");";
+		var references = UnusedExportFiles.CodeReferences( code );
+		Assert.IsFalse( references.Contains( "*" ) );
+		string[] files = ["README.md", "OTHER.md", "THIRD.md", "balance.txt"];
+		CollectionAssert.AreEquivalent( new[] { "balance.txt" }, UnusedExportFiles.FindUsed( files, [], references, _ => [] ).ToArray() );
+		var reads = UnusedExportFiles.CodeReferences( "var text = FileSystem.Mounted.ReadAllText(path);" );
+		Assert.IsTrue( reads.Contains( "*" ), "Real unknown file reads must still retain all files" );
+		Assert.IsTrue( UnusedExportFiles.CodeReferences( "var paths = Directory.GetFiles(folder);" ).Contains( "*" ), "Unknown directory enumeration must also retain files at the export root" );
+	}
+
+	[TestMethod]
 	public void TextReferencesPreserveRelativePathsAndFilenamesWithSpaces()
 	{
 		string[] files = ["ui/my icon.png", "textures/background.png", "unused.png"];

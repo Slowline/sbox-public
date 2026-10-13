@@ -26,19 +26,13 @@ internal static class UnusedExportFiles
 	internal static HashSet<string> CodeReferences( string text )
 	{
 		var syntax = CSharpSyntaxTree.ParseText( text ).GetRoot();
-		var references = new HashSet<string>( TextReferences( text ), StringComparer.OrdinalIgnoreCase );
+		var comments = syntax.DescendantTrivia().Where( x => x.IsKind( SyntaxKind.SingleLineCommentTrivia ) || x.IsKind( SyntaxKind.MultiLineCommentTrivia ) ||
+			x.IsKind( SyntaxKind.SingleLineDocumentationCommentTrivia ) || x.IsKind( SyntaxKind.MultiLineDocumentationCommentTrivia ) );
+		var code = syntax.ReplaceTrivia( comments, ( _, _ ) => default ).ToFullString();
+		// Wildcards are meaningful only at file/resource accesses, not in arbitrary text (e.g. "all" or "*").
+		var references = new HashSet<string>( TextReferences( code ).Where( x => !x.Contains( '*' ) && !x.Contains( '?' ) ), StringComparer.OrdinalIgnoreCase );
 		foreach ( var literal in syntax.DescendantNodes().OfType<LiteralExpressionSyntax>() )
-			if ( literal.Token.Value is string value ) references.Add( value );
-		foreach ( var interpolation in syntax.DescendantNodes().OfType<InterpolatedStringExpressionSyntax>() )
-		{
-			var pattern = Pattern( interpolation );
-			if ( pattern.Contains( '/' ) || pattern.Contains( '.' ) ) references.Add( pattern );
-		}
-		foreach ( var addition in syntax.DescendantNodes().OfType<BinaryExpressionSyntax>().Where( x => x.IsKind( SyntaxKind.AddExpression ) ) )
-		{
-			var pattern = Pattern( addition );
-			if ( pattern.Contains( '/' ) || pattern.Contains( '.' ) ) references.Add( pattern );
-		}
+			if ( literal.Token.Value is string value && !value.Contains( '*' ) && !value.Contains( '?' ) ) references.Add( value );
 		foreach ( var call in syntax.DescendantNodes().OfType<InvocationExpressionSyntax>() )
 		{
 			var member = call.Expression as MemberAccessExpressionSyntax;
@@ -50,8 +44,6 @@ internal static class UnusedExportFiles
 				references.Add( "*_c" );
 				continue;
 			}
-			if ( method == "Combine" && member.Expression.ToString() is "Path" or "System.IO.Path" )
-				references.Add( string.Join( "/", call.ArgumentList.Arguments.Select( x => Pattern( x.Expression ) ) ) );
 			if ( method is not ("Load" or "LoadAsync" or "LoadFromFile" or "ReadAllText" or "ReadAllBytes" or "ReadAllLines" or "ReadAllTextAsync" or "ReadAllBytesAsync" or "ReadJson" or "OpenRead" or "FindFile" or "FindDirectory" or "GetTexture" or "FileExists" or "DirectoryExists" or "EnumerateFiles" or "GetFiles") ) continue;
 			if ( member.Expression.ToString().StartsWith( "FileSystem.Data", StringComparison.Ordinal ) ) continue;
 			if ( call.ArgumentList.Arguments.Count == 0 ) continue;
@@ -67,7 +59,7 @@ internal static class UnusedExportFiles
 			}
 			var argumentPattern = Pattern( argument );
 			if ( method is "FindFile" or "FindDirectory" or "DirectoryExists" or "EnumerateFiles" or "GetFiles" )
-				argumentPattern = argumentPattern.TrimEnd( '/', '\\' ) + "/*";
+				argumentPattern = argumentPattern.Trim( '*' ).Length == 0 ? "*" : argumentPattern.TrimEnd( '/', '\\' ) + "/*";
 			if ( argumentPattern.Trim( '*' ).Length == 0 && method is "Load" or "LoadAsync" or "GetTexture" )
 			{
 				// Unknown resource names may select any compiled asset or raw image/audio/video.
