@@ -5,6 +5,15 @@ namespace Editor;
 
 partial class StandaloneExporter
 {
+	/// <summary>Files omitted by the optional reference analysis.</summary>
+	public IReadOnlyList<ProjectPublisher.ProjectFile> ExcludedFiles => Array.AsReadOnly( _unusedFiles );
+
+	/// <summary>Whether unknown file reads forced the analysis to keep every file.</summary>
+	public bool HasUnresolvedFileAccess { get; private set; }
+
+	/// <summary>Whether code references conservatively include resource/file patterns.</summary>
+	public bool HasWildcardCodeReferences { get; private set; }
+
 	void FilterUnusedFiles()
 	{
 		Logger.Info( "Analyzing unused export files.." );
@@ -24,7 +33,9 @@ partial class StandaloneExporter
 				references.UnionWith( UnusedExportFiles.CodeReferences( File.ReadAllText( source ) ) );
 			}
 		}
-		if ( references.Contains( "*" ) )
+		HasUnresolvedFileAccess = references.Contains( "*" );
+		HasWildcardCodeReferences = references.Any( x => x.Contains( '*' ) );
+		if ( HasUnresolvedFileAccess )
 			Logger.Info( "Unresolved dynamic file access found; retaining all export files" );
 
 		var explicitResources = (Project.Config.Resources ?? "").Split( '\n', StringSplitOptions.RemoveEmptyEntries )

@@ -50,6 +50,7 @@ partial class StandaloneWizard
 				{
 					Clicked = () => EditorUtility.OpenFolder( PublishConfig.TargetDir )
 				} );
+				r.Add( new Button( "Export Report", "description" ) { Clicked = Wizard.ShowExportReport } );
 				r.AddStretchCell();
 			}
 

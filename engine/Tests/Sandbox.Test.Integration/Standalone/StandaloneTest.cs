@@ -86,6 +86,8 @@ public class StandaloneTest
 				var exporter = await StandaloneExporter.FromConfig( config );
 				await exporter.AddFile( File.ReadAllBytes( "core/maps/error.vpk" ), "maps/export_test.vpk" );
 				await exporter.Run();
+				Assert.AreEqual( filterUnusedFiles, exporter.ExcludedFiles.Any( x => x.Name == documentationName ), "The report must contain exactly the documentation omitted by the opt-in analysis" );
+				if ( !filterUnusedFiles ) Assert.AreEqual( 0, exporter.ExcludedFiles.Count );
 			}
 
 			//

@@ -128,9 +128,11 @@ partial class StandaloneWizard
 				await Exporter.Run();
 
 				Wizard.wasSuccessful = true;
+				Wizard.CompletedExporter = Exporter;
 
 				StepLabel.Text = "Done!";
 				CurrentOperationLabel.Text = "Completed Successfully - hit Next to continue";
+				if ( PublishConfig.ExcludeUnusedFiles ) Wizard.ShowExportReport();
 			}
 			catch
 			{
