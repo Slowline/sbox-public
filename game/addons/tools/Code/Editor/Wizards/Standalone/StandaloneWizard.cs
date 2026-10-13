@@ -43,7 +43,8 @@ partial class StandaloneWizard : BaseWizard
 	public static StandaloneWizard Open( Project project )
 	{
 		var w = new StandaloneWizard( project );
-		w.CreateWindow( 800, 600 );
+		var window = w.CreateWindow( 1200, 900 );
+		window.MinimumSize = new Vector2( 800, 600 );
 		return w;
 	}
 }

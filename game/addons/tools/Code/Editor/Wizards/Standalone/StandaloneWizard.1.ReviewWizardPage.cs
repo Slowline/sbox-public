@@ -402,8 +402,38 @@ file class BrandingInput : Widget
 {
 	private Vector2 _targetSize;
 	private string _extension;
+	private string _value;
+	private Pixmap _iconPreview;
+	private TextureWidget _texturePreview;
 
-	public string Value { get; set; }
+	public string Value
+	{
+		get => _value;
+		set
+		{
+			_value = value;
+			ToolTip = value;
+			_iconPreview = null;
+			_texturePreview.Texture = null;
+			_texturePreview.Visible = false;
+			if ( !string.IsNullOrWhiteSpace( value ) )
+			{
+				if ( _extension == ".ico" )
+					_iconPreview = Pixmap.FromFile( Path.GetFullPath( value ) );
+				else
+				{
+					// Windows' picker returns an absolute path; textures need an asset-relative path.
+					var path = AssetSystem.FindByPath( value )?.Path ?? (Path.IsPathRooted( value ) ? null : value);
+					if ( path is not null )
+					{
+						_texturePreview.Texture = Texture.Load( path );
+						_texturePreview.Visible = true;
+					}
+				}
+			}
+			Update();
+		}
+	}
 	public Action OnSelected { get; set; }
 
 	public float IconSize { get; set; } = 32;
@@ -415,6 +445,9 @@ file class BrandingInput : Widget
 
 		Cursor = CursorShape.Finger;
 		FixedSize = CalculateSize();
+		Layout = Layout.Column();
+		Layout.Margin = 0;
+		_texturePreview = Layout.Add( new TextureWidget { Padding = 8, TransparentForMouseEvents = true, Visible = false } );
 	}
 
 	private Vector2 CalculateSize()
@@ -469,6 +502,15 @@ file class BrandingInput : Widget
 			var r = ContentRect;
 			r.Width = SizeHint().x;
 			Paint.DrawRect( r, 4f );
+		}
+
+		if ( _texturePreview.Visible ) return;
+		if ( _iconPreview is { Width: > 0, Height: > 0 } )
+		{
+			var bounds = ContentRect.Shrink( 6 );
+			var scale = MathF.Min( bounds.Width / _iconPreview.Width, bounds.Height / _iconPreview.Height );
+			Paint.Draw( bounds.Align( _iconPreview.Size * scale, TextFlag.Center ), _iconPreview );
+			return;
 		}
 
 		// 
