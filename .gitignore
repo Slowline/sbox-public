@@ -92,6 +92,7 @@ engine/TestResults/
 /game/bin/win64/logs
 /game/config/**/*.json
 /game/config/**/*.json.backup
+/game/core/cfg/**
 /game/core/cfg/*.vcfg
 /game/core/cfg/video.txt
 /game/core/cfg/video_tools.txt
