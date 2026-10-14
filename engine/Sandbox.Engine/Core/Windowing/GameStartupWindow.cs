@@ -84,7 +84,13 @@ internal sealed class GameStartupWindow : IDisposable
 			SdlWindow.Check( Sdl.ShowWindow( Handle ) );
 			SdlWindow.WarnIfFailed( Sdl.SyncWindow( Handle ) );
 
-			logo = standalone && Standalone.Manifest?.StartupBranding is { Count: > 0 } ? null : LoadBitmap( LogoPath, "startup logo" );
+			if ( standalone && Standalone.Manifest?.StartupBranding is { Count: > 0 } branding )
+			{
+				var previewPath = "/core/" + StartupBranding.PreviewPath;
+				if ( branding[0].IsVideo && EngineFileSystem.Root.FileExists( previewPath ) )
+					logo = LoadBitmap( previewPath, "startup video preview" );
+			}
+			else logo = LoadBitmap( LogoPath, "startup logo" );
 			if ( !standalone ) backdrop = LoadBitmap( BackdropPath, "startup backdrop" );
 
 			UpdateProgress( 0, status );

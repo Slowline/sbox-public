@@ -23,6 +23,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<None Update="Standalone\TestData\preview.webm">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 		<None Update="Resources\Audio\*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>

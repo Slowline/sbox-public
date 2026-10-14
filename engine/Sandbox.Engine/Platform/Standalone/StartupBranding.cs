@@ -4,6 +4,8 @@ namespace Sandbox;
 [Expose]
 public class StartupBranding
 {
+	internal const string PreviewPath = "materials/startup_branding/preview.png";
+
 	[KeyProperty, FilePath( Extension = "vtex,png,jpg,jpeg,tga,bmp,webp,mp4,webm,mov,avi,wmv,mkv,m4v" )]
 	public string Path { get; set; }
 

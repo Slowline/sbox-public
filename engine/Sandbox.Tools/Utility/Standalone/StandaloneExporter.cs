@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
@@ -106,6 +106,9 @@ public partial class StandaloneExporter
 			WriteExecutable();
 			Logger.Info( "Copying files.." );
 			await CopyAllFiles();
+			if ( StandaloneManifest.StartupBranding.FirstOrDefault()?.IsVideo == true &&
+				_files.Any( f => f.Destination == Path.Combine( _exportConfig.TargetDir, "core", StartupBranding.PreviewPath ) && f.State != QueuedFileState.Copied ) )
+				throw new IOException( "Couldn't copy the startup video preview" );
 			if ( StandaloneManifest.StartupBranding.Any( x => _files.Any( f => f.Destination == Path.Combine( _exportConfig.TargetDir, "core", x.Path ) && f.State != QueuedFileState.Copied ) ) )
 				throw new IOException( "Couldn't finish export because startup branding files failed to copy" );
 			if ( _exportConfig.ExcludeUnusedFiles && _files.Any( x => x.Step == BuildStep.CopyProjectAssets && x.State != QueuedFileState.Copied ) )
@@ -182,7 +185,7 @@ public partial class StandaloneExporter
 		if ( _exportConfig.ExcludeUnusedFiles )
 			FilterUnusedFiles();
 		QueueAddonFiles( _exportConfig.TargetDir, BuildStep.CopyProjectAssets );
-		QueueBaseFiles( _exportConfig.TargetDir );
+		await QueueBaseFiles( _exportConfig.TargetDir );
 	}
 
 	private async Task CopyAllFiles()
@@ -238,7 +241,7 @@ public partial class StandaloneExporter
 		}
 	}
 
-	private void QueueBaseFiles( string baseDir )
+	private async Task QueueBaseFiles( string baseDir )
 	{
 		var engineDir = Environment.CurrentDirectory;
 
@@ -303,7 +306,7 @@ public partial class StandaloneExporter
 		// Splash screen image
 		// Has to be part of core (maybe we can change this)
 		//
-		QueueStartupBranding( baseDir );
+		await QueueStartupBranding( baseDir );
 		if ( _exportConfig.StartupBranding is null && !string.IsNullOrEmpty( _exportConfig.StartupImage ) )
 		{
 			var path = _exportConfig.StartupImage;
