@@ -28,7 +28,7 @@ public class StartupBranding
 			throw new ArgumentException( "Startup branding timings must be finite and non-negative" );
 	}
 
-	internal float Opacity( float elapsed, float duration ) => Math.Clamp( Math.Min(
-		FadeIn > 0 ? elapsed / FadeIn : 1,
+	internal float Opacity( float elapsed, float duration, bool skipFadeIn = false ) => Math.Clamp( Math.Min(
+		!skipFadeIn && FadeIn > 0 ? elapsed / FadeIn : 1,
 		FadeOut > 0 ? (duration - elapsed) / FadeOut : 1 ), 0, 1 );
 }

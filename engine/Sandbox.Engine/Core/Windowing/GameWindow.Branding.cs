@@ -11,17 +11,27 @@ internal sealed partial class GameWindow
 		var entries = Standalone.Manifest?.StartupBranding;
 		if ( entries is not { Count: > 0 } ) return;
 
+		var previewPath = "core/" + StartupBranding.PreviewPath;
+		using var previewImage = entries[0].IsVideo && EngineFileSystem.Root.FileExists( previewPath )
+			? Bitmap.CreateFromBytes( EngineFileSystem.Root.ReadAllBytes( previewPath ).ToArray() ) : null;
+		using var previewTexture = previewImage?.ToTexture( mips: false );
+		var continuePreview = previewTexture is not null;
+		brandingTexture = previewTexture;
+		brandingOpacity = 1;
+
 		// Branding needs the swapchain before the first engine frame; keep the shared SDL window alive.
 		CompleteStartup();
 		System.Diagnostics.Debug.Assert( window.SwapChain != default );
+		if ( continuePreview ) DrawStartupImage( startupProgress );
 		playingBranding = true;
 		try
 		{
 			foreach ( var entry in entries )
 			{
 				if ( Application.WantsExit ) break;
-				try { await PlayStartupBranding( entry ); }
+				try { await PlayStartupBranding( entry, continuePreview ); }
 				catch ( Exception e ) { Log.Warning( e, $"Couldn't play startup branding '{entry?.Path}'" ); }
+				continuePreview = false;
 			}
 		}
 		finally
@@ -31,7 +41,7 @@ internal sealed partial class GameWindow
 		}
 	}
 
-	async Task PlayStartupBranding( StartupBranding entry )
+	async Task PlayStartupBranding( StartupBranding entry, bool continuePreview )
 	{
 		entry.Validate();
 		using var video = entry.IsVideo ? new VideoPlayer() : null;
@@ -44,7 +54,7 @@ internal sealed partial class GameWindow
 			video.OnFinished = () => finished = true;
 			video.Play( EngineFileSystem.Root, "core/" + entry.Path );
 		}
-		brandingTexture = texture;
+		if ( !continuePreview ) brandingTexture = texture;
 		var started = Stopwatch.GetTimestamp();
 		var ready = false;
 		var lastPlayback = 0f;
@@ -67,8 +77,9 @@ internal sealed partial class GameWindow
 				}
 				if ( ready ) imageElapsed += Math.Min( frameTime, 0.1f );
 				var elapsed = imageElapsed;
-				if ( brandingTexture is { IsLoaded: true } && !ready )
+				if ( texture is { IsLoaded: true } && !ready )
 				{
+					brandingTexture = texture;
 					ready = true;
 					started = Stopwatch.GetTimestamp();
 					elapsed = 0;
@@ -88,7 +99,7 @@ internal sealed partial class GameWindow
 				if ( ready && ((finished && (duration <= 0 || elapsed >= duration - 0.1f)) || ((video is null || duration > 0) && elapsed >= duration)) ) break;
 				if ( !ready && Stopwatch.GetElapsedTime( started ).TotalSeconds > 15 )
 					throw new TimeoutException( "Startup branding did not load" );
-				brandingOpacity = ready ? entry.Opacity( elapsed, video is not null && duration <= 0 ? float.PositiveInfinity : duration ) : 0;
+				brandingOpacity = ready ? entry.Opacity( elapsed, video is not null && duration <= 0 ? float.PositiveInfinity : duration, skipFadeIn: continuePreview ) : continuePreview ? 1 : 0;
 				DrawStartupImage( startupProgress );
 				await Task.Delay( 16 );
 			}

@@ -57,6 +57,9 @@ public class ExportConfigTest
 	{
 		var entry = new StartupBranding { FadeIn = 1, FadeOut = 2 };
 		Assert.AreEqual( 0f, entry.Opacity( 0, 6 ) );
+		Assert.AreEqual( 1f, entry.Opacity( 0, 6, skipFadeIn: true ) );
+		Assert.AreEqual( 1f, entry.Opacity( 0.5f, 6, skipFadeIn: true ) );
+		Assert.AreEqual( 0.5f, entry.Opacity( 5, 6, skipFadeIn: true ) );
 		Assert.AreEqual( 0.5f, entry.Opacity( 0.5f, 6 ) );
 		Assert.AreEqual( 1f, entry.Opacity( 2, 6 ) );
 		Assert.AreEqual( 0.5f, entry.Opacity( 5, 6 ) );
