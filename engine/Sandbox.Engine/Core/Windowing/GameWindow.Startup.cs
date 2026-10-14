@@ -1,3 +1,4 @@
+using NativeEngine;
 using Sandbox.Utility;
 
 namespace Sandbox.Engine;

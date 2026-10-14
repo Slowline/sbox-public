@@ -11,8 +11,9 @@ internal sealed partial class GameWindow
 		var entries = Standalone.Manifest?.StartupBranding;
 		if ( entries is not { Count: > 0 } ) return;
 
-		startupWindow?.Dispose();
-		startupWindow = null;
+		// Branding needs the swapchain before the first engine frame; keep the shared SDL window alive.
+		CompleteStartup();
+		System.Diagnostics.Debug.Assert( window.SwapChain != default );
 		playingBranding = true;
 		try
 		{
