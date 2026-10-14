@@ -84,7 +84,7 @@ internal sealed class GameStartupWindow : IDisposable
 			SdlWindow.Check( Sdl.ShowWindow( Handle ) );
 			SdlWindow.Check( Sdl.SyncWindow( Handle ) );
 
-			logo = LoadBitmap( LogoPath, "startup logo" );
+			logo = standalone && Standalone.Manifest?.StartupBranding is { Count: > 0 } ? null : LoadBitmap( LogoPath, "startup logo" );
 			if ( !standalone ) backdrop = LoadBitmap( BackdropPath, "startup backdrop" );
 
 			UpdateProgress( 0, status );

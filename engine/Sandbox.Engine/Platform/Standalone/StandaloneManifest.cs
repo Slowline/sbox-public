@@ -36,4 +36,7 @@ public class StandaloneManifest
 	/// Game content, including assemblies, is stored in the standalone assets VPK.
 	/// </summary>
 	public bool PackAssets { get; set; }
+
+	/// <summary>Ordered startup images and videos, stored in loose core content.</summary>
+	public List<StartupBranding> StartupBranding { get; set; } = [];
 }

@@ -264,6 +264,7 @@ internal static class Bootstrap
 			}
 
 			GameWindow.Current?.UpdateStartupProgress( 0.95f, "Finalizing startup" );
+			var branding = GameWindow.Current?.PlayStartupBranding() ?? Task.CompletedTask;
 
 			if ( SteamClient.IsValid && ErrorReporter.IsUsingSentry )
 			{
@@ -287,6 +288,7 @@ internal static class Bootstrap
 
 			if ( !Application.IsHeadless )
 			{
+				SyncContext.RunBlocking( branding );
 				LoadingFinished();
 			}
 

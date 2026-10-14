@@ -95,6 +95,10 @@ partial class StandaloneWizard
 								PublishConfig.TargetDir = preset.Config.TargetDir;
 								PublishConfig.TargetIcon = preset.Config.TargetIcon;
 								PublishConfig.StartupImage = preset.Config.StartupImage;
+								PublishConfig.StartupBranding = preset.Config.StartupBranding?.Select( x => new StartupBranding
+								{
+									Path = x.Path, Duration = x.Duration, FadeIn = x.FadeIn, FadeOut = x.FadeOut
+								} ).ToList();
 								PublishConfig.PackAssets = preset.Config.PackAssets;
 								PublishConfig.ExcludeUnusedFiles = preset.Config.ExcludeUnusedFiles;
 								PublishConfig.AppId = preset.Config.AppId;
@@ -251,11 +255,12 @@ partial class StandaloneWizard
 							var w = new Widget( group );
 							w.Layout = Layout.Column();
 							w.Layout.Spacing = 4;
-							w.Layout.Add( new Label( "Startup Image" ) );
-
-							var startupInput = w.Layout.Add( new BrandingInput( w, ".vtex", new( 512, 512 ) ), 0 );
-							startupInput.Value = PublishConfig.StartupImage;
-							startupInput.OnSelected = () => { PublishConfig.StartupImage = startupInput.Value; };
+							PublishConfig.StartupBranding ??= string.IsNullOrWhiteSpace( PublishConfig.StartupImage )
+								? [] : [new StartupBranding { Path = PublishConfig.StartupImage }];
+							w.Layout.Add( new Label( "Drag the handles to reorder. Set fade times to 0 for a cut. Videos play once in full." ) );
+							var sheet = new ControlSheet();
+							sheet.AddProperty( PublishConfig, x => x.StartupBranding );
+							w.Layout.Add( sheet );
 
 							w.Layout.AddStretchCell();
 							group.Layout.Add( w );

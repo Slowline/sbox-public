@@ -70,6 +70,10 @@ internal static partial class AudioEngine
 	/// </summary>
 	internal static void Tick()
 	{
+		// MuteDevice starts native callbacks, which require an initialized mixing graph.
+		if ( Mixer.Master is null )
+			return;
+
 		if ( !g_pAudioDevice.IsValid() )
 			return;
 

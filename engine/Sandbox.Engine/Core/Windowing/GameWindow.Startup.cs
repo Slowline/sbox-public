@@ -8,6 +8,9 @@ internal sealed partial class GameWindow
 	float startupProgress = -1;
 	string startupStatus = string.Empty;
 	bool startupFinished;
+	Texture brandingTexture;
+	float brandingOpacity = 1;
+	bool playingBranding;
 	internal void UpdateStartupProgress( float progress, string status )
 	{
 		ThreadSafe.AssertIsMainThread();
@@ -19,6 +22,7 @@ internal sealed partial class GameWindow
 
 		startupProgress = progress;
 		startupStatus = status;
+		if ( playingBranding ) return;
 		if ( startupWindow is { IsOpen: true } softwareSplash )
 		{
 			softwareSplash.UpdateProgress( progress, status );
@@ -52,12 +56,14 @@ internal sealed partial class GameWindow
 		using var statusTexture = statusBitmap?.ToTexture( mips: false );
 		var context = g_pRenderDevice.CreateRenderContext( 0 );
 		IMaterial material = default;
+		IMaterial brandingMaterial = default;
 		ITexture texture = default;
 		ITexture backdrop = default;
 		try
 		{
 			material = MaterialSystem2.CreateRawMaterial( "_initial_window.vmat", "shaders/unlit.shader_c", true );
-			texture = g_pResourceSystem.LoadTexture( "materials/startup_background.vtex" );
+			if ( !playingBranding && Standalone.Manifest?.StartupBranding is not { Count: > 0 } )
+				texture = g_pResourceSystem.LoadTexture( "materials/startup_background.vtex" );
 			if ( !Application.IsStandalone )
 			{
 				backdrop = g_pResourceSystem.LoadTexture( "materials/startup_backdrop.vtex" );
@@ -83,6 +89,15 @@ internal sealed partial class GameWindow
 				DrawStartupLogo( context, material, attributes, texture, width, height );
 			}
 
+			if ( material.IsValid && brandingTexture is { IsValid: true, IsLoaded: true } )
+			{
+				brandingMaterial = MaterialSystem2.CreateRawMaterial( "_startup_branding.vmat", "shaders/startup_branding.shader_c", true );
+				attributes.SetFloatValue( "BrandingOpacity", brandingOpacity );
+				attributes.SetTextureValue( "BrandingTexture", brandingTexture.native, -1 );
+				if ( brandingMaterial.IsValid )
+					DrawStartupLogo( context, brandingMaterial, attributes, brandingTexture.native, width, height );
+			}
+
 			if ( material.IsValid && statusBitmap is not null && statusTexture is { IsValid: true } )
 			{
 				DrawStartupStatus( context, material, attributes, statusTexture.native, statusBitmap.Width, statusBitmap.Height, width, height );
@@ -104,6 +119,8 @@ internal sealed partial class GameWindow
 
 			if ( material.IsValid )
 				material.DestroyStrongHandle();
+			if ( brandingMaterial.IsValid )
+				brandingMaterial.DestroyStrongHandle();
 		}
 	}
 

@@ -23,6 +23,8 @@ partial class StandaloneExporter
 		var references = new HashSet<string>( UnusedExportFiles.TextReferences( Project.Config.ToJson() ), StringComparer.OrdinalIgnoreCase );
 		if ( !string.IsNullOrWhiteSpace( _exportConfig.StartupImage ) && AssetSystem.FindByPath( _exportConfig.StartupImage ) is { } startupImage )
 			references.Add( startupImage.Path );
+		foreach ( var entry in _exportConfig.StartupBranding ?? [] )
+			references.Add( AssetSystem.FindByPath( entry.Path )?.Path ?? entry.Path );
 		foreach ( var project in projects.Where( x => x.HasCodePath() ) )
 		{
 			foreach ( var source in Directory.EnumerateFiles( project.GetCodePath(), "*", SearchOption.AllDirectories ) )

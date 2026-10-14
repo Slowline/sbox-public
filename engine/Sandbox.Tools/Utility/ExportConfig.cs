@@ -47,6 +47,10 @@ public class ExportConfig
 	[Title( "Startup Image" ), ResourceType( "vtex" )] // should make this png
 	public string StartupImage { get; set; }
 
+	/// <summary>Ordered branding assets. Null preserves legacy single-image presets.</summary>
+	[Title( "Startup Branding" )]
+	public List<StartupBranding> StartupBranding { get; set; }
+
 	/// <summary>
 	/// Pack game content into a VPK instead of exporting loose files.
 	/// </summary>

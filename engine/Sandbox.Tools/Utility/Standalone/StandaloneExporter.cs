@@ -80,6 +80,11 @@ public partial class StandaloneExporter
 
 		ValidateExecutableName( _exportConfig.ExecutableName );
 		ParseExecutableVersion( _exportConfig.ExecutableVersion );
+		foreach ( var branding in _exportConfig.StartupBranding ?? [] )
+		{
+			if ( branding is null ) throw new ArgumentException( "Startup branding entries cannot be empty" );
+			branding.Validate();
+		}
 		if ( _exportConfig.PackAssets || _exportConfig.ExcludeUnusedFiles )
 		{
 			foreach ( var file in PackageManifest.Assets.Where( x => x.AbsolutePath is not null ) )
@@ -101,6 +106,8 @@ public partial class StandaloneExporter
 			WriteExecutable();
 			Logger.Info( "Copying files.." );
 			await CopyAllFiles();
+			if ( StandaloneManifest.StartupBranding.Any( x => _files.Any( f => f.Destination == Path.Combine( _exportConfig.TargetDir, "core", x.Path ) && f.State != QueuedFileState.Copied ) ) )
+				throw new IOException( "Couldn't finish export because startup branding files failed to copy" );
 			if ( _exportConfig.ExcludeUnusedFiles && _files.Any( x => x.Step == BuildStep.CopyProjectAssets && x.State != QueuedFileState.Copied ) )
 				throw new IOException( "Couldn't finish filtered export because some project files failed to copy" );
 			if ( _exportConfig.PackAssets )
@@ -133,6 +140,12 @@ public partial class StandaloneExporter
 		}
 		finally
 		{
+			foreach ( var source in _temporarySources )
+			{
+				try { File.Delete( source ); }
+				catch ( Exception exception ) { Logger.Warning( exception, $"Couldn't remove temporary export file {source}" ); }
+			}
+			_temporarySources.Clear();
 			if ( _packedAssetsFolder is not null ) Directory.Delete( Path.GetDirectoryName( _packedAssetsFolder ), true );
 		}
 
@@ -175,21 +188,9 @@ public partial class StandaloneExporter
 	private async Task CopyAllFiles()
 	{
 		var orderedFiles = _files.OrderBy( x => x.Step );
-		try
+		foreach ( var f in orderedFiles )
 		{
-			foreach ( var f in orderedFiles )
-			{
-				await CopyFileAsync( f );
-			}
-		}
-		finally
-		{
-			foreach ( var source in _temporarySources )
-			{
-				try { File.Delete( source ); }
-				catch ( Exception exception ) { Logger.Warning( exception, $"Couldn't remove temporary export file {source}" ); }
-			}
-			_temporarySources.Clear();
+			await CopyFileAsync( f );
 		}
 	}
 
@@ -302,7 +303,8 @@ public partial class StandaloneExporter
 		// Splash screen image
 		// Has to be part of core (maybe we can change this)
 		//
-		if ( !string.IsNullOrEmpty( _exportConfig.StartupImage ) )
+		QueueStartupBranding( baseDir );
+		if ( _exportConfig.StartupBranding is null && !string.IsNullOrEmpty( _exportConfig.StartupImage ) )
 		{
 			var path = _exportConfig.StartupImage;
 			var startupImagePath = Path.Combine( _exportConfig.Project.GetAssetsPath(), path + "_c" );
