@@ -1,4 +1,3 @@
-using NativeEngine;
 using Sandbox.Utility;
 
 namespace Sandbox.Engine;
@@ -23,21 +22,7 @@ internal sealed partial class GameWindow
 		startupProgress = progress;
 		startupStatus = status;
 		if ( playingBranding ) return;
-		if ( startupWindow is { IsOpen: true } softwareSplash )
-		{
-			softwareSplash.UpdateProgress( progress, status );
-			return;
-		}
-
-		try
-		{
-			DrawStartupImage( progress );
-		}
-		catch ( Exception e )
-		{
-			startupFinished = true;
-			Log.Warning( e, "Couldn't draw startup image" );
-		}
+		startupWindow?.UpdateProgress( progress, status );
 	}
 
 
