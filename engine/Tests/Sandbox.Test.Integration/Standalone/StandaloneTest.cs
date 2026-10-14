@@ -41,11 +41,13 @@ public class StandaloneTest
 		Project.Clear();
 	}
 
+	// Slow: full export plus booting a second engine. PR runs skip it, master runs it.
 	[TestMethod]
 	[DataRow( false, false )]
 	[DataRow( true, false )]
 	[DataRow( false, true )]
 	[DataRow( true, true )]
+	[TestCategory( "Slow" )]
 	public async Task ExportAndRun( bool packAssets, bool filterUnusedFiles )
 	{
 		var config = new ExportConfig();
