@@ -19,6 +19,12 @@ public static class Preferences
 	public static float MusicVolume { get; internal set; } = 1.0f;
 
 	/// <summary>
+	/// The user's preferred volume for the game's own sounds (the Game mixer), as set in the options, clamped between 0 and 1
+	/// </summary>
+	[ConVar( "game_volume", ConVarFlags.Protected, Help = "Game volume", Min = 0.0f, Saved = true )]
+	public static float GameVolume { get; internal set; } = 1.0f;
+
+	/// <summary>
 	/// The user's preferred VOIP volume, as set in the options, clamped between 0 and 1
 	/// </summary>
 	[ConVar( "voip_volume", ConVarFlags.Protected, Help = "Voice chat volume", Min = 0.0f, Saved = true )]
@@ -56,6 +62,12 @@ public static class Preferences
 	/// </summary>
 	[ConVar( "voip_mode", ConVarFlags.Protected, Help = "Voice chat mode: PushToTalk, OpenMicrophone, or Disabled", Saved = true )]
 	public static VoiceMode VoiceMode { get; internal set; } = VoiceMode.PushToTalk;
+
+	/// <summary>
+	/// Keep the recording device open between push-to-talk presses, in case opening it causes a delay.
+	/// </summary>
+	[ConVar( "voip_streamlined", ConVarFlags.Protected, Help = "Keep the recording device open between push-to-talk presses, in case opening it causes a delay", Saved = true )]
+	public static bool StreamlinedPushToTalk { get; internal set; }
 
 	/// <summary>
 	/// Name of the microphone used for voice chat, empty for the system default.

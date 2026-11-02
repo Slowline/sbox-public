@@ -263,9 +263,10 @@ public partial class StandaloneExporter
 			var coreFiles = GetCoreFiles( engineDir );
 			QueueFrom( coreFiles );
 
-			foreach ( var resource in GetSurfaceReferences( coreFiles ) )
+			// Surfaces aren't any use without their impact sounds, decals etc.
+			foreach ( var reference in GetSurfaceReferences( coreFiles ) )
 			{
-				QueueCopy( resource.AbsolutePath, Path.Combine( baseDir, "core", resource.RelativePath ), BuildStep.CopyCoreAssets );
+				QueueCopy( reference.AbsolutePath, Path.Combine( baseDir, "core", reference.RelativePath ), BuildStep.CopyCoreAssets );
 			}
 
 			// Fetch all the DLLs we need to run the engine

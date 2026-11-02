@@ -19,7 +19,7 @@ public static partial class Program
 		options.SingleThreaded = args.Any( x => x == "-s" );
 		options.ConsoleOutput = !args.Any( x => x == "-q" );
 
-		// Most combos to compile at once, default picks from cores and free memory
+		// Most combos to compile at once, default is one per core
 		var threadsIndex = Array.IndexOf( args, "-j" );
 		if ( threadsIndex >= 0 && threadsIndex + 1 < args.Length && int.TryParse( args[threadsIndex + 1], out var threads ) )
 		{
@@ -97,7 +97,7 @@ public static partial class Program
 				}
 
 				FastTimer fastTimer = FastTimer.StartNew();
-				var result = SyncContext.RunBlocking( ShaderCompile.Compile( c.AbsolutePath, c.RelativePath, options, default ) );
+				var result = AsyncPump.RunSynchronously( () => ShaderCompile.Compile( c.AbsolutePath, c.RelativePath, options, default ) );
 
 				if ( !result.Success )
 				{
@@ -199,7 +199,7 @@ public static partial class Program
 
 				try
 				{
-					var result = SyncContext.RunBlocking( ShaderCompile.RecompileFromCompiled( absolute, options, default ) );
+					var result = AsyncPump.RunSynchronously( () => ShaderCompile.RecompileFromCompiled( absolute, options, default ) );
 
 					if ( !result.Success || result.CompiledShader is null )
 					{

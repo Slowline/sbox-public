@@ -30,6 +30,7 @@ internal sealed partial class SourceMaterialBuilder
 {
 	private BaseMount Host { get; }
 	private string FullPath { get; }
+	private readonly string contentRoot;
 	private readonly VmtParameters parameters;
 	private readonly string shaderName;
 	private readonly TextureTransforms transforms;
@@ -41,14 +42,16 @@ internal sealed partial class SourceMaterialBuilder
 	{
 		Host = mount;
 		FullPath = path;
+		contentRoot = BaseMount.GetContentRoot( path, "materials" );
 		parameters = new VmtParameters( VmtFile.SelectParameters( vmt ), FullPath );
 		shaderName = VmtFile.NormalizeShaderName( vmt.ShaderName );
 		proxies = vmt.Root.GetBlock( "proxies" );
 		(transforms, alpha, animation) = GetMaterialProxies( vmt, shaderName, parameters );
 	}
 
-	internal Material CreateMaterial( string resourceName )
+	internal Material CreateMaterial( string resourceName, bool mapSurface = false )
 	{
+		proxyProgram?.ResetInstructions();
 		var material = shaderName switch
 		{
 			"eyes" or "eyerefract" => CreateEye( shaderName == "eyerefract", parameters, resourceName ),
@@ -58,12 +61,17 @@ internal sealed partial class SourceMaterialBuilder
 			"refract" or "core" => CreateRefract( shaderName == "core", resourceName ),
 			"aftershock" => CreateRefract( false, resourceName, aftershock: true ),
 			"volumeclouds" => CreateVolumeClouds( resourceName ),
-			"monitorscreen" => CreateMonitor( resourceName ),
-			"vertexlitgeneric" or "lightmappedgeneric" or "unlitgeneric" or "vortwarp"
-				=> CreateSurface( shaderName, parameters, transforms, alpha, animation, resourceName ),
+			"monitorscreen" => CreateMonitor( resourceName, mapSurface ),
+			"water" => CreateEffect( true, parameters, transforms, alpha, animation, resourceName ),
+			"worldvertextransition" => CreateSurface( "lightmappedgeneric", parameters, transforms, alpha, animation, resourceName, mapSurface: true ),
+			"vertexlitgeneric" or "lightmappedgeneric" or "unlitgeneric" or "vortwarp" or "worldtwotextureblend"
+				=> CreateSurface( shaderName, parameters, transforms, alpha, animation, resourceName, mapSurface ),
 			_ => throw new NotSupportedException( $"{FullPath}: unsupported Source material shader '{shaderName}'." )
 		};
+		BindProxyProgram( material );
+		material.Set( "g_bFogEnabled", !parameters.Boolean( "$nofog" ) );
 		material.Attributes.Set( "PhysicsSurfaceProperties", Host.GetSurfaceBindingName( parameters.String( "$surfaceprop", "default" ), FullPath ) );
+		UpdateProbeUsage( material );
 		return material;
 	}
 
@@ -73,4 +81,24 @@ internal sealed partial class SourceMaterialBuilder
 		return Material.Create( name, shader, anonymous: false )
 			?? throw new InvalidOperationException( $"Could not create '{FullPath}' using {shader}." );
 	}
+
+	internal static void UpdateProbeUsage( Material material )
+	{
+		if ( !IsSurfaceShader( material ) )
+			return;
+
+		material.Attributes.Set( "UsesBakedLightingFromProbe", IsLitSurfaceShader( material )
+			&& material.GetFeature( "F_SOURCE_LIGHTMAP" ) == 0
+			&& material.GetFeature( "F_SOURCE_PROP_LIGHTING" ) == 0 );
+	}
+
+	internal static bool IsSurfaceShader( Material material ) => material.ShaderName is
+		"shaders/source1/vertexlitgeneric.shader" or "shaders/source1/lightmappedgeneric.shader"
+		or "shaders/source1/unlitgeneric.shader" or "shaders/source1/worldvertextransition.shader"
+		or "shaders/source1/vortwarp.shader" or "shaders/source1/monitorscreen.shader"
+		or "shaders/source1/worldtwotextureblend.shader";
+
+	internal static bool IsLitSurfaceShader( Material material ) => IsSurfaceShader( material )
+		&& material.ShaderName is not ("shaders/source1/unlitgeneric.shader" or "shaders/source1/monitorscreen.shader")
+		&& (material.ShaderName != "shaders/source1/vortwarp.shader" || material.GetFeature( "F_SOURCE_UNLIT" ) == 0);
 }

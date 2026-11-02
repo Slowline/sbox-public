@@ -66,6 +66,9 @@ partial class StandaloneExporter
 
 		// Config files
 		"cfg/*",
+
+		// Physics surfaces - materials find these by name, so nothing references them as assets
+		"surfaces/*.surface_c",
 	];
 
 	private IEnumerable<string> GetCoreFiles( string engineDir )
@@ -74,30 +77,26 @@ partial class StandaloneExporter
 	}
 
 	/// <summary>
-	/// The compiled files the given surfaces reference (impact prefabs, footstep sounds, decal textures).
-	/// Nothing in the game references these directly, so they'd never be picked up otherwise. Some live
-	/// outside of core (generated textures are transients), so they're keyed by resource path.
+	/// Everything the core surfaces reference (impact sounds, decals, prefabs). Some of these
+	/// live outside core, so they're found through the asset system rather than a whitelist.
 	/// </summary>
-	private static IEnumerable<CodeResource> GetSurfaceReferences( IEnumerable<string> files )
+	private static IEnumerable<CodeResource> GetSurfaceReferences( IEnumerable<string> coreFiles )
 	{
-		foreach ( var file in files )
+		foreach ( var file in coreFiles.Where( x => x.EndsWith( ".surface_c", StringComparison.OrdinalIgnoreCase ) ) )
 		{
-			if ( !file.EndsWith( ".surface_c", StringComparison.OrdinalIgnoreCase ) )
-				continue;
-
 			var asset = AssetSystem.FindByPath( file );
 			if ( asset is null )
 			{
-				Logger.Warning( $"Surface '{file}' isn't in the asset system, its references won't be exported" );
+				Logger.Warning( $"Couldn't find surface asset for {file}, its references won't be exported" );
 				continue;
 			}
 
 			foreach ( var reference in asset.GetReferences( true ) )
 			{
-				var absolutePath = reference.GetCompiledFile( true );
 				var relativePath = reference.GetCompiledFile( false );
+				var absolutePath = reference.GetCompiledFile( true );
 
-				if ( string.IsNullOrEmpty( absolutePath ) || string.IsNullOrEmpty( relativePath ) )
+				if ( string.IsNullOrEmpty( relativePath ) || string.IsNullOrEmpty( absolutePath ) )
 					continue;
 
 				yield return new CodeResource( relativePath.TrimStart( '/', '\\' ), absolutePath );

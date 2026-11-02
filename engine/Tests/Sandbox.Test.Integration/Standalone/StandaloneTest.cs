@@ -61,6 +61,10 @@ public class StandaloneTest
 		string sourceDocumentation = null;
 		var documentationName = $"unused_export_test_{Guid.NewGuid():N}.md";
 
+		// We'll test to make sure this env var isn't changed by running the exported game
+		var oldEnginePath = Environment.GetEnvironmentVariable( "FACEPUNCH_ENGINE", EnvironmentVariableTarget.User );
+		var newEnginePath = oldEnginePath;
+
 		try
 		{
 			var project = Project.AddFromFile( "unittest/addons/spacewars/.sbproj" );
@@ -148,6 +152,9 @@ public class StandaloneTest
 					Assert.IsTrue( image.AsSpan().IndexOf( System.Text.Encoding.Unicode.GetBytes( resource ) ) >= 0, $"Executable has no {resource} resource" );
 				}
 				Assert.IsTrue( image.AsSpan().IndexOf( System.Text.Encoding.UTF8.GetBytes( $"\"Ident\":\"{project.Config.Ident}\"" ) ) >= 0, "Executable's manifest doesn't name the game" );
+
+				// Nothing references surfaces as assets, without them every MeshComponent fails to build
+				Assert.IsTrue( File.Exists( Path.Combine( config.TargetDir, "core", "surfaces", "default.surface_c" ) ), "Export is missing core/surfaces/default.surface_c" );
 			}
 
 			//
@@ -206,7 +213,17 @@ public class StandaloneTest
 		{
 			if ( sourceDocumentation is not null ) File.Delete( sourceDocumentation );
 			CleanOutput( config );
+
+			newEnginePath = Environment.GetEnvironmentVariable( "FACEPUNCH_ENGINE", EnvironmentVariableTarget.User );
+
+			if ( oldEnginePath != newEnginePath )
+			{
+				// Put it back so other tests still work
+				Environment.SetEnvironmentVariable( "FACEPUNCH_ENGINE", oldEnginePath, EnvironmentVariableTarget.User );
+			}
 		}
+
+		Assert.AreEqual( oldEnginePath, newEnginePath, "The standalone exe overwrote the user-level FACEPUNCH_ENGINE" );
 	}
 
 	private void CleanOutput( ExportConfig config )
